@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>联机聊天室</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0a0a1a;font-family:-apple-system;height:100vh;display:flex;flex-direction:column;}
+.login{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;gap:20px;}
+.login h2{font-size:28px;}
+.login input{padding:15px;width:200px;border:none;border-radius:15px;background:#2a2a3e;color:white;font-size:18px;text-align:center;outline:none;}
+.login button{padding:15px 40px;border:none;border-radius:15px;background:#4a90d9;color:white;font-size:18px;font-weight:bold;cursor:pointer;}
+#app{display:none;flex-direction:column;height:100%;}
+#msgs{flex:1;overflow-y:auto;padding:15px;color:#e0e0e0;}
+.msg-line{padding:4px 0;font-size:16px;line-height:1.5;}
+.msg-line .name{font-weight:bold;}
+.msg-line .name.me{color:#4a90d9;}
+.msg-line .name.other{color:#ff8c42;}
+.msg-line .time{font-size:11px;opacity:0.4;margin-left:8px;}
+.msg-line.sys{color:#888;font-size:13px;font-style:italic;text-align:center;padding:8px 0;}
+.input-box{display:flex;padding:10px;background:#1a1a2e;gap:8px;}
+.input-box input{flex:1;padding:12px;border:none;border-radius:20px;background:#2a2a3e;color:white;font-size:16px;outline:none;}
+.input-box button{padding:12px 18px;border:none;border-radius:20px;background:#4a90d9;color:white;font-size:16px;font-weight:bold;cursor:pointer;}
+.status{padding:8px;text-align:center;font-size:13px;color:#888;}
+</style>
+</head>
+<body>
+
+<div class="login" id="login">
+<h2>🚂 联机聊天室</h2>
+<p style="color:#888">输入服务器端口号</p>
+<input type="number" id="portInput" placeholder="端口号">
+<button onclick="join()">加入聊天</button>
+</div>
+
+<div id="app">
+<div class="status" id="status">🔗 连接中...</div>
+<div id="msgs"></div>
+<div class="input-box">
+<input id="inp" placeholder="输入消息...">
+<button onclick="send()">发送</button>
+</div>
+</div>
+
+<script>
+let ws, username;
+
+function join(){
+    const port = document.getElementById('portInput').value;
+    if(!port) return;
+    username = '📱' + Math.floor(Math.random()*900+100);
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    connect(port);
+}
+
+function connect(port){
+    ws = new WebSocket('ws://bore.pub:' + port);
+    
+    ws.onopen = function(){
+        document.getElementById('status').textContent = '🟢 已连接';
+        ws.send(JSON.stringify({type:'join', username: username}));
+    };
+    
+    ws.onmessage = function(e){
+        try {
+            const d = JSON.parse(e.data);
+            const msgs = document.getElementById('msgs');
+            const div = document.createElement('div');
+            
+            if(d.type === 'system'){
+                div.className = 'msg-line sys';
+                div.textContent = d.msg || '';
+            } else if(d.type === 'message'){
+                div.className = 'msg-line';
+                const isMe = (d.username === username);
+                const nameClass = isMe ? 'name me' : 'name other';
+                const suffix = isMe ? '(我)' : '';
+                div.innerHTML = '<span class="' + nameClass + '">' + (d.username||'?') + suffix + '</span><span class="time">' + (d.time||'') + '</span><br>' + (d.msg||'');
+            } else {
+                return;
+            }
+            
+            msgs.appendChild(div);
+            msgs.scrollTop = msgs.scrollHeight;
+        } catch(err){}
+    };
+    
+    ws.onclose = function(){
+        document.getElementById('status').textContent = '🔴 断开连接';
+    };
+}
+
+function send(){
+    const inp = document.getElementById('inp');
+    const msg = inp.value.trim();
+    if(!msg || !ws) return;
+    ws.send(JSON.stringify({type:'message', msg: msg}));
+    inp.value = '';
+    inp.focus();
+}
+
+document.getElementById('inp').addEventListener('keydown', function(e){
+    if(e.key === 'Enter') send();
+});
+</script>
+</body>
+</html>
